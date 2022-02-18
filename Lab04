@@ -218,7 +218,7 @@ ggplot()+
   ) +
   xlab('Year')+
   ylab('AW[mm/day]')+
-  ggtitle('Excess at Toms Creek, VA')+
+  ggtitle('AW at Toms Creek, VA')+
   scale_color_manual('Parameters:',values = colors)
 
 dev.off()
