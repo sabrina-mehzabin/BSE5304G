@@ -217,8 +217,8 @@ package.skeleton("BSEHydroModels",list=c("soil_wetting_above_capacity",
 pdf()
 colors <- c('Qmm' = 'red', 'Qpred' = 'green')
 ggplot() +
-  geom_line(data=BotSlope, aes(x=date,y=Qmm,color='Qmm'), size=.5) + 
-  geom_line(data=BotSlope, aes(x=date,y=Qpred,color='Qpred'), size=.5)+
+  geom_line(data=TMWBnew, aes(x=date,y=Qmm,color='Qmm'), size=.5) + 
+  geom_line(data=TMWBnew, aes(x=date,y=Qpred,color='Qpred'), size=.5)+
   theme(
     legend.position ='right'
   ) +
@@ -415,30 +415,17 @@ NSeff(BotSlopeCN$Qmm,BotSlopeCN$Qpred)
 
 # finish building all the hillslope HRUs….
 
-pdf()
-colors <- c('SnowMelt' = 'red', 'SWE' = 'green')
-ggplot() +
-  geom_line(data=BotSlopeCN, aes(x=date,y=SnowMelt_mm,color='SnowMelt'), size=.5) + 
-  geom_line(data=BotSlopeCN, aes(x=date,y=SnowfallWatEq_mm,color='SWE'), size=.5)+
-  theme(
-    legend.position ='right'
-  ) +
-  xlab('Year')+
-  ylab('SnowMelt and SWE')+
-  ggtitle('SnowMelt & SWE for Toms Creek Watershed')+
-  scale_color_manual('Parameters:',values = colors)
-dev.off()
 
 pdf()
 colors <- c('Qmm' = 'red', 'Qpred' = 'blue')
 ggplot() +
-  geom_line(data=TMWBnew, aes(x=date,y=Qmm,color='Qmm'), size=.5) + 
-  geom_line(data=TMWBnew, aes(x=date,y=Qpred,color='Qpred'), size=.5)+
+  geom_line(data=BotSlopeCN, aes(x=date,y=Qmm,color='Qmm'), size=.5) + 
+  geom_line(data=BotSlopeCN, aes(x=date,y=Qpred,color='Qpred'), size=.5)+
   theme(
     legend.position ='right'
   ) +
   xlab('Year')+
   ylab('Qmm vs Qpred (mm/day)')+
-  ggtitle('Qmm and Qpred for TMWB at Toms Creek Watershed')+
+  ggtitle('Qmm and Qpred for TMWB')+
   scale_color_manual('Parameters:',values = colors)
 dev.off()
