@@ -1,0 +1,121 @@
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(httr,EcoHydRology,curl,data.table,multisensi)
+
+PET_fromTemp <- function (Jday, Tmax_C, Tmin_C, lat_radians, AvgT = (Tmax_C + Tmin_C)/2, 
+                          albedo = 0.18, TerrestEmiss = 0.97, aspect = 0, slope = 0, forest = 0, PTconstant=1.26, AEparams=list(vp=NULL, opt="linear"))
+{
+  cloudiness <- EstCloudiness(Tmax_C, Tmin_C)
+  DailyRad <- NetRad(lat_radians, Jday, Tmax_C, Tmin_C, albedo, forest, slope, aspect, AvgT, 
+                     cloudiness, TerrestEmiss, AvgT, AEparams=AEparams)
+  potentialET <- PTpet(DailyRad, AvgT, PTconstant)
+  potentialET[which(potentialET < 0)] <- 0
+  potentialET[which(Tmax_C == -999 | Tmin_C == -999)] <- (-999)
+  return(potentialET)
+}
+
+T <- seq(from = 5, to = 365, by = 5)
+PET2 <- function(X, t = T) {
+  out <- matrix(nrow = nrow(X), ncol = length(t), NA)
+  for (i in 1:nrow(X)) {
+    out[i, ] <- EcoHydRology::PET_fromTemp(lat_radians = X$lat_radians[i],
+                                    Tmax_C= X$Tmax_C[i],
+                                    Tmin_C= X$Tmax_C[i]-X$Tmin_C, 
+                                    albedo= X$albedo[i],
+                                    slope= X$slope[i],
+                                    aspect= X$aspect[i],
+                                    AvgT= X$AvgT,
+                                    TerrestEmiss= X$TerrestEmiss,
+                                    Jday=t,
+                                    units= "Wm2")
+  }
+  out <- as.data.frame(out)
+  names(out) <- paste("t", t, sep = "")
+  return(out)
+}
+
+n <- 10
+set.seed(1234)
+X <- data.frame(lat_radians = runif(n, min = 0, max = pi/4), 
+                Tmax_C = runif(n, min = 1,max = 40), 
+                Tmin_C = runif(n, min = -5,max = 10 ),
+                albedo = runif(n, min = 0, max = 1),
+                slope = runif(n, min = 0, max = 0.2),
+                TerrestEmiss = runif(n, min = 0, max = 1),
+                aspect = runif(n, min = 0, max = pi*2))
+Y <- Solar2(X)
+par(cex.axis = 0.7, cex.lab = 0.8)
+plot(T, Y[1, ], type = "l", xlab = "Time", ylab = "Population size",
+     ylim = c(0, max(Y)))
+for (i in 2:n) {
+  lines(T, Y[i, ], type = "l", col = i)
+}
+
+
+X <- expand.grid(Tmax_C = c(10, 20, 30), 
+                 Tmin_C = c(0, 3, 7),
+                 albedo = c (0.2, 0.4, 0.6), 
+                 slope = c(0.1,0.2,0.3),
+                 aspect = c(0.1,.5,1.0),
+                 TerrestEmiss= c(0.2, 0.4, 0.7),
+                 lat_radianst=c(0.1,.77,1.1)
+)
+
+Y <- Solar2(X) ## this part can be performed outside R if necessary
+Solar.seq <- multisensi(design=X, model=Y, reduction=NULL, center=FALSE) 
+
+# color palettes: rainbow, heat.colors, terrain.colors, topo.colors,
+# cm.colors
+plot(Solar.seq, normalized = TRUE, color = terrain.colors, gsi.plot = FALSE)
+title(xlab = "Time in half-decades.")
+plot(Solar.seq, normalized = FALSE, color = terrain.colors, gsi.plot = FALSE)
+title(xlab = "Time in half-decades.")
+
+Solar.seq <- multisensi(model=Solar2, reduction=NULL, center=FALSE,
+                        design.args = list( Tmax_C = c(10, 20, 30), 
+                                            Tmin_C = c(0, 3, 7),
+                                            albedo = c (0.2, 0.4, 0.6), 
+                                            slope = c(0.1,0.2,0.3),
+                                            aspect = c(0.1,.5,1.0),
+                                            TerrestEmiss= c(0.2, 0.4, 0.7),
+                                            lat_radianst=c(0.1,.77,1.1)))
+
+
+Solar.pca <- multisensi(design=X, model=Y, reduction=basis.ACP, scale=FALSE)
+
+
+plot(Solar.pca, graph = 1)
+plot(Solar.pca, graph = 1)
+plot(Solar.pca, graph = 1)
+
+library(sensitivity)
+m <- 10000
+Xb <- data.frame(lat_radians = runif(m, min = 0, max = pi/4), 
+                 Tmax_C = runif(m, min = 1,max = 40), 
+                 Tmin_C = runif(m, min = -5,max = 10 ),
+                 albedo = runif(m, min = 0, max = 1),
+                 slope = runif(m, min = 0, max = 0.2),
+                 TerrestEmiss = runif(m, min = 0, max = 1),
+                 aspect = runif(m, min = 0, max = pi*2))
+
+
+Solar.seq.sobol <- multisensi(design = sobol2007, model = Solar2,
+                              reduction = NULL, analysis = analysis.sensitivity, center = TRUE,
+                              design.args = list(X1 = Xb[1:(m/2), ], 
+                                                 X2 = Xb[(1 + m/2):m, ], 
+                                                 nboot = 100),
+                              analysis.args = list(keep.outputs = FALSE))     
+
+plot(Solar.seq.sobol, normalized = TRUE, color = terrain.colors, gsi.plot = FALSE)
+title(xlab = "Time in half-decades")
+
+
+Solar.seq.fast <- multisensi(design = fast99, model = Solar2,
+                             center = FALSE, reduction = NULL, analysis = analysis.sensitivity,
+                             design.args=list( factors=c("K","Y0","a"), n=1000, q = "qunif",
+                                               q.arg = list(list(min=100, max=1000), list(min=1, max=40),
+                                                            list(min = 0.05, max = 0.2))),
+                             analysis.args=list(keep.outputs=FALSE))
+
+
+plot(Solar.seq.fast, normalized = TRUE, color = terrain.colors, gsi.plot = FALSE)
+title(xlab = "Time in half-decades")
