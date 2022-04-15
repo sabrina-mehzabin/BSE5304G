@@ -1,0 +1,98 @@
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(httr,EcoHydRology,curl,data.table,multisensi)
+
+SoilStorage(S_avg, field_capacity, soil_water_content, porosity)
+
+T <- seq(from = 5, to = 120, by = 5)
+SoilStorage2 <- function(X, t = T) {
+  out <- matrix(nrow = nrow(X), ncol = length(t), NA)
+  for (i in 1:nrow(X)) {
+    out[i, ] <- EcoHydRology::SoilStorage(S_avg=t, 
+                                    field_capacity= X$field_capacity[i],
+                                    soil_water_content= X$soil_water_content[i],
+                                    porosity= X$porosity[i]
+                                    
+                                    )
+  }
+  out <- as.data.frame(out)
+  names(out) <- paste("t", t, sep = "")
+  return(out)
+}
+
+n <- 10
+set.seed(1234)
+X <- data.frame( 
+                field_capacity = runif(n, min = 0.1,max = 0.5), 
+                
+                soil_water_content = runif(n, min = 0.2, max = 0.4),
+                porosity = runif(n, min = 0.2, max = 0.7)
+                )
+Y <- SoilStorage2(X)
+par(cex.axis = 0.7, cex.lab = 0.8)
+plot(T, Y[1, ], type = "l", xlab = "Storage", ylab = "Population",
+     ylim = c(0, 1000))
+for (i in 2:n) {
+  lines(T, Y[i, ], type = "l", col = i)
+}
+
+
+X <- expand.grid(field_capacity = c(0.2,0.3,0.5), 
+                 soil_water_content = c(0.1, 0.4, 0.6),
+                 porosity = c(0.3,0.2,0.6)
+                 
+                 
+)
+
+Y <- SoilStorage2(X) ## this part can be performed outside R if necessary
+SoilStorage.seq <- multisensi(design=X, model=Y, reduction=NULL, center=FALSE) 
+
+# color palettes: rainbow, heat.colors, terrain.colors, topo.colors,
+# cm.colors
+plot(SoilStorage.seq, normalized = TRUE, color = terrain.colors, gsi.plot = FALSE)
+title(xlab = "Time in half-decades.")
+plot(SoilStorage.seq, normalized = FALSE, color = terrain.colors, gsi.plot = FALSE)
+title(xlab = "Time in half-decades.")
+
+SoilStorage.seq <- multisensi(model=SoilStorage2, reduction=NULL, center=FALSE,
+                        design.args = list( field_capacity = c(0.2,0.3,0.5), 
+                                            soil_water_content = c(0.1, 0.4, 0.6),
+                                            porosity = c(0.3,0.4,0.6)))
+
+
+SoilStorage.pca <- multisensi(design=X, model=Y, reduction=basis.ACP, scale=FALSE)
+
+
+plot(SoilStorage.pca, graph = 1)
+plot(SoilStorage.pca, graph = 1)
+plot(SoilStorage.pca, graph = 1)
+
+library(sensitivity)
+m <- 10000
+Xb <- data.frame( 
+  field_capacity = runif(m, min = 0.2,max = 0.5), 
+  
+  soil_water_content = runif(m, min = 0.1, max = 0.9),
+  porosity = runif(m, min = 0.2, max = 0.6))
+
+
+SoilStorage.seq.sobol <- multisensi(design = sobol2007, model = SoilStorage2,
+                              reduction = NULL, analysis = analysis.sensitivity, center = TRUE,
+                              design.args = list(X1 = Xb[1:(m/2), ], 
+                                                 X2 = Xb[(1 + m/2):m, ], 
+                                                 nboot = 100),
+                              analysis.args = list(keep.outputs = FALSE))     
+
+plot(SoilStorage.seq.sobol, normalized = TRUE, color = terrain.colors, gsi.plot = FALSE)
+title(xlab = "Time in half-decades")
+
+
+SoilStorage.seq.fast <- multisensi(design = fast99, model = SoilStorage2,
+                             center = FALSE, reduction = NULL, analysis = analysis.sensitivity,
+                             design.args=list( factors=c("K","Y0","a"), n=1000, q = "qunif",
+                                               q.arg = list(list(min=100, max=1000), list(min=1, max=40),
+                                                            list(min = 0.05, max = 0.2))),
+                             analysis.args=list(keep.outputs=FALSE))
+
+
+plot(SoilStorage.seq.fast, normalized = TRUE, color = terrain.colors, gsi.plot = FALSE)
+title(xlab = "Time in half-decades")
